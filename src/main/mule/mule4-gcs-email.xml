@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:email="http://www.mulesoft.org/schema/mule/email"
+	xmlns:smtp="http://www.mulesoft.org/schema/mule/smtp"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:mime="http://www.mulesoft.org/schema/mule/mime"
+      xmlns:file="http://www.mulesoft.org/schema/mule/file"
+      xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/smtp http://www.mulesoft.org/schema/mule/smtp/current/mule-smtp.xsd 
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/mime http://www.mulesoft.org/schema/mule/mule-mime.xsd
+        http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+        http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd">
+
+    <http:listener-config name="HTTP_Listener_Config" doc:name="HTTP Listener Config" doc:id="3283add6-f144-41b6-ac86-24bc741eb819" >
+        <http:listener-connection host="0.0.0.0" port="8081" />
+        <http:multipart-config fileParsing="MULTIPART"/>
+    </http:listener-config>
+
+    <file:config name="File_Config" doc:name="File Config" doc:id="fdbbd9c1-5606-40e9-b407-637d4528cbad" />
+
+
+    <flow name="multipart-api-demoFlow" doc:id="eea2b266-d54a-413d-8ace-888cbb6950b8" >
+        <http:listener doc:name="Listener" doc:id="45bbae63-686f-40f6-ad7b-99adfccde6d3" config-ref="HTTP_Listener_Config" path="/your-path" parseRequest="false"/>
+		
+        <ee:transform doc:name="Transform attachments" doc:id="9f5059f1-6944-45a4-8850-e01fc7e425a4">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output multipart/form-data
+---
+{
+    "from": vars.parameters.from,
+    "to": vars.parameters.to,
+    "subject": vars.parameters.subject,
+    "body": payload.parts filter ($.headers["content-disposition"] contains "name=\"body\"")[0].content,
+    "attachments": payload.parts filter ($.headers["content-disposition"] contains "filename=") map {
+        "filename": $.filename,
+        "content": $.content
+    }
+}
+                ]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <!-- Process the extracted values as needed -->
+        
+        <!-- For example, send email using SMTP connector -->
+        <http:request method="POST" doc:name="Send Email" doc:id="46c4e91f-cdda-4efe-a15a-d89700fa63e3"
+            url="http://your-smtp-server.com/api/send-email">
+            <http:headers><![CDATA[#[{
+    "Content-Type": "multipart/form-data"
+}]]]></http:headers>
+            <http:body><![CDATA[#[vars.payload]]]></http:body>
+        </http:request>
+    
+</flow>
+</mule>
